@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>인스타 여백 채우기</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="인스타 여백">
+<meta name="theme-color" content="#f2f3f5">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f2f3f5; --panel:#ffffff; --ink:#17181c; --muted:#6b6f78; --line:#dcdfe5;
+  --accent:#1e5bff; --accent-ink:#ffffff; --check:#e6e8ec;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16171a; --panel:#1f2024; --ink:#f0f1f3; --muted:#9a9ea8; --line:#33353b;
+    --accent:#5b8cff; --accent-ink:#0b0d12; --check:#2a2c31;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16171a; --panel:#1f2024; --ink:#f0f1f3; --muted:#9a9ea8; --line:#33353b;
+  --accent:#5b8cff; --accent-ink:#0b0d12; --check:#2a2c31;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;font-size:15px;line-height:1.55}
+main{max-width:960px;margin:0 auto;padding:32px 20px 64px}
+h1{font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
+.lead{color:var(--muted);margin:0 0 24px;max-width:560px}
+
+.drop{display:block;width:100%;border:2px dashed var(--line);border-radius:14px;background:var(--panel);padding:36px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--accent)}
+.drop strong{display:block;font-size:17px;font-weight:500}
+.drop span{color:var(--muted);font-size:14px}
+.drop input{display:none}
+
+.controls{display:flex;flex-wrap:wrap;gap:14px 28px;align-items:flex-end;margin:22px 0 10px}
+.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:transparent;color:var(--ink);padding:12px 16px;font:inherit;font-size:14px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.colorrow{display:flex;align-items:center;gap:8px}
+.swatch{width:36px;height:36px;border-radius:8px;border:1px solid var(--line);padding:0;background:none;cursor:pointer}
+.swatch input{width:100%;height:100%;border:0;padding:0;background:none;cursor:pointer}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;padding-bottom:8px}
+.check input{width:16px;height:16px;accent-color:var(--accent)}
+
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 26px}
+.btn{border:0;border-radius:10px;padding:14px 20px;font:inherit;font-size:15px;font-weight:500;cursor:pointer;background:var(--panel);color:var(--ink);border:1px solid var(--line)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.card .thumb{background:
+  linear-gradient(45deg,var(--check) 25%,transparent 25%,transparent 75%,var(--check) 75%),
+  linear-gradient(45deg,var(--check) 25%,transparent 25%,transparent 75%,var(--check) 75%);
+  background-size:16px 16px;background-position:0 0,8px 8px;
+  display:flex;align-items:center;justify-content:center;aspect-ratio:1;padding:10px}
+.card img{max-width:100%;max-height:100%;box-shadow:0 1px 3px rgba(0,0,0,.25);display:block}
+.hint{font-size:12px;color:var(--muted);padding:0 12px 10px}
+.card .meta{padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card .name{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .size{font-size:12px;color:var(--muted);white-space:nowrap}
+.card .dl{border:0;background:none;color:var(--accent);font:inherit;font-size:14px;font-weight:500;cursor:pointer;padding:10px 4px;white-space:nowrap}
+.status{color:var(--muted);font-size:14px;min-height:1.5em;margin-bottom:10px}
+.empty{color:var(--muted);text-align:center;padding:30px 0}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <h1>인스타 여백 채우기</h1>
+  <p class="lead">가로 사진의 양옆이 잘리지 않도록, 인스타그램 비율에 맞춰 위아래에 배경색을 채워 줍니다. 사진은 브라우저 안에서만 처리되고 어디에도 업로드되지 않아요. iPhone에서는 결과 이미지를 길게 눌러 사진 앱에 저장할 수도 있어요.</p>
+
+  <label class="drop" id="drop">
+    <strong>사진을 여기에 끌어다 놓거나 눌러서 선택</strong>
+    <span>JPG · PNG · WebP, 여러 장 한 번에 가능</span>
+    <input type="file" id="file" accept="image/*" multiple>
+  </label>
+
+  <div class="controls">
+    <div class="field">
+      <label>목표 비율</label>
+      <div class="seg" id="ratioSeg" role="group" aria-label="목표 비율">
+        <button type="button" data-r="0.8" aria-pressed="true">4:5 세로</button>
+        <button type="button" data-r="1">1:1 정사각</button>
+        <button type="button" data-r="1.91">1.91:1 가로</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>배경색</label>
+      <div class="colorrow">
+        <div class="swatch"><input type="color" id="color" value="#ffffff" aria-label="배경색 선택"></div>
+        <button type="button" class="chip" data-c="#ffffff" aria-pressed="true">흰색</button>
+        <button type="button" class="chip" data-c="#000000">검정</button>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="resize" checked> 가로 1080px로 맞추기 (인스타 권장)</label>
+    <div class="field">
+      <label>저장 형식</label>
+      <div class="seg" id="fmtSeg" role="group" aria-label="저장 형식">
+        <button type="button" data-f="jpg" aria-pressed="true">JPG</button>
+        <button type="button" data-f="png">PNG</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="dlAll" disabled>전체 저장</button>
+    <button class="btn" id="clear" disabled>모두 지우기</button>
+  </div>
+  <div class="status" id="status"></div>
+
+  <div class="grid" id="grid"><div class="empty">아직 사진이 없어요. 위에서 사진을 추가해 보세요.</div></div>
+</main>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const state = { ratio: 0.8, color: '#ffffff', resize: true, fmt: 'jpg', items: [] };
+  const downloads = {
+    save: async ({ filename, data }) => {
+      const type = filename.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      const file = new File([data], filename, { type });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file] }); return { status: 'saved' }; }
+        catch (e) { if (e && e.name === 'AbortError') throw { code: 'declined' }; }
+      }
+      const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(data); });
+      const a = document.createElement('a');
+      a.href = dataUrl; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      return { status: 'saved' };
+    }
+  };
+
+  const grid = $('#grid'), status = $('#status');
+
+  function setStatus(t){ status.textContent = t || ''; }
+
+  function refreshButtons(){
+    const has = state.items.length > 0;
+    $('#dlAll').disabled = !has || !downloads;
+    $('#clear').disabled = !has;
+    document.querySelectorAll('.dl').forEach(b => b.disabled = !downloads);
+    if (has) setStatus(`${state.items.length}장 준비됨`);
+    else setStatus('');
+  }
+
+  function render(item){
+    const img = item.img, r = state.ratio;
+    let w = img.naturalWidth, h = img.naturalHeight;
+    if (state.resize && w > 1080) { h = Math.round(h * 1080 / w); w = 1080; }
+    let cw, ch;
+    if (w / h > r) { cw = w; ch = Math.round(w / r); } else { ch = h; cw = Math.round(h * r); }
+    const c = item.canvas; c.width = cw; c.height = ch;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = state.color; ctx.fillRect(0, 0, cw, ch);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, Math.round((cw - w) / 2), Math.round((ch - h) / 2), w, h);
+    item.sizeEl.textContent = `${cw} × ${ch}`;
+    item.out.src = c.toDataURL(state.fmt === 'png' ? 'image/png' : 'image/jpeg', 0.95);
+  }
+  function renderAll(){ state.items.forEach(render); }
+
+  function outName(item){
+    const base = item.name.replace(/\.[^.]+$/, '');
+    return `${base}_insta.${state.fmt}`;
+  }
+  function toBlob(canvas){
+    return new Promise(res => canvas.toBlob(res, state.fmt === 'png' ? 'image/png' : 'image/jpeg', 0.95));
+  }
+  async function save(item){
+    if (!downloads) return;
+    try {
+      const blob = await toBlob(item.canvas);
+      await downloads.save({ filename: outName(item), data: blob });
+      setStatus(`${outName(item)} 저장됨`);
+    } catch (e) {
+      if (e && e.code === 'declined') setStatus('저장을 취소했어요.');
+      else if (e && e.code === 'rate_limited') setStatus('잠시 후 다시 시도해 주세요.');
+      else setStatus('저장하지 못했어요. 다시 시도해 주세요.');
+    }
+  }
+
+  function addFiles(files){
+    const isImg = f => f.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(f.name);
+    const list = [...files].filter(isImg);
+    if (!list.length) return;
+    if (!state.items.length) grid.innerHTML = '';
+    list.forEach(file => {
+      const img = new Image();
+      img.onload = () => {
+        const card = document.createElement('div'); card.className = 'card';
+        const thumb = document.createElement('div'); thumb.className = 'thumb';
+        const canvas = document.createElement('canvas');
+        const out = document.createElement('img'); out.alt = file.name;
+        thumb.appendChild(out);
+        const meta = document.createElement('div'); meta.className = 'meta';
+        const left = document.createElement('div');
+        const name = document.createElement('div'); name.className = 'name'; name.textContent = file.name;
+        const size = document.createElement('div'); size.className = 'size';
+        left.append(name, size);
+        const dl = document.createElement('button'); dl.className = 'dl'; dl.type = 'button'; dl.textContent = '저장';
+        meta.append(left, dl);
+        const hint = document.createElement('div'); hint.className = 'hint'; hint.textContent = '이미지를 길게 눌러 사진에 저장할 수 있어요';
+        card.append(thumb, meta, hint);
+        grid.appendChild(card);
+        const item = { name: file.name, img, canvas, out, sizeEl: size };
+        dl.addEventListener('click', () => save(item));
+        state.items.push(item);
+        render(item);
+        refreshButtons();
+      };
+      img.onerror = () => {
+        if (/heic|heif/i.test(file.type + file.name)) setStatus(`${file.name}은(는) HEIC 형식이라 브라우저가 열 수 없어요. 사진 앱에서 "복제 → JPEG"로 바꾸거나, 설정 → 사진 → "Mac 또는 PC로 전송"을 "자동"으로 바꿔 주세요.`);
+        else setStatus(`${file.name}을(를) 열지 못했어요. 다른 사진으로 다시 시도해 주세요.`);
+      };
+      const reader = new FileReader();
+      reader.onload = () => { img.src = reader.result; };
+      reader.onerror = () => setStatus(`${file.name}을(를) 읽지 못했어요.`);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // inputs
+  const drop = $('#drop');
+  $('#file').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+  document.addEventListener('paste', e => { if (e.clipboardData && e.clipboardData.files.length) addFiles(e.clipboardData.files); });
+
+  function segSetup(id, attr, onPick){
+    const seg = $(id);
+    seg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+      onPick(b.dataset[attr]);
+    }));
+  }
+  segSetup('#ratioSeg', 'r', v => { state.ratio = parseFloat(v); renderAll(); });
+  segSetup('#fmtSeg', 'f', v => { state.fmt = v; renderAll(); });
+
+  const colorInput = $('#color');
+  function setColor(c){
+    state.color = c; colorInput.value = c;
+    document.querySelectorAll('.chip').forEach(ch => ch.setAttribute('aria-pressed', ch.dataset.c === c));
+    renderAll();
+  }
+  colorInput.addEventListener('input', e => setColor(e.target.value));
+  document.querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', () => setColor(ch.dataset.c)));
+  $('#resize').addEventListener('change', e => { state.resize = e.target.checked; renderAll(); });
+
+  $('#dlAll').addEventListener('click', async () => {
+    if (!state.items.length) return;
+    const type = state.fmt === 'png' ? 'image/png' : 'image/jpeg';
+    const files = [];
+    for (const item of state.items) {
+      const blob = await toBlob(item.canvas);
+      files.push(new File([blob], outName(item), { type }));
+    }
+    if (navigator.canShare && navigator.canShare({ files })) {
+      try { await navigator.share({ files }); setStatus(`${files.length}장을 공유 시트로 보냈어요. "이미지 저장"을 누르면 사진 앱에 들어가요.`); }
+      catch (e) { if (e && e.name === 'AbortError') setStatus('저장을 취소했어요.'); else setStatus('공유에 실패했어요. 한 장씩 저장해 보세요.'); }
+      return;
+    }
+    for (const item of state.items) { await save(item); await new Promise(r => setTimeout(r, 300)); }
+  });
+  $('#clear').addEventListener('click', () => {
+    state.items = [];
+    grid.innerHTML = '<div class="empty">아직 사진이 없어요. 위에서 사진을 추가해 보세요.</div>';
+    refreshButtons();
+  });
+})();
+</script>
+</body>
+</html>
