@@ -143,9 +143,9 @@ h1{font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
 
   <section class="panel" id="panel-video" hidden>
     <label class="drop" id="vdrop">
-      <strong>동영상을 눌러서 선택</strong>
+      <strong>동영상을 눌러서 선택 (여러 개 가능)</strong>
       <span>iPhone Safari 기준 · 1~2분 이내 영상 권장</span>
-      <input type="file" id="vfile" accept="video/*">
+      <input type="file" id="vfile" accept="video/*" multiple>
     </label>
 
     <div class="controls">
@@ -170,7 +170,7 @@ h1{font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
 
     <div class="actions">
       <button class="btn primary" id="vstart" disabled>변환 시작</button>
-      <button class="btn" id="vsave" disabled>저장</button>
+      <button class="btn" id="vsave" disabled>완료된 영상 모두 저장</button>
     </div>
     <div class="bar"><i id="vbar"></i></div>
     <div class="status" id="vstatus"></div>
@@ -178,8 +178,8 @@ h1{font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
 
     <div class="vwrap">
       <div class="vprev" id="vprev" hidden><canvas id="vcanvas"></canvas></div>
+      <div class="grid" id="vgrid"></div>
       <video id="vsrc" playsinline hidden></video>
-      <video id="vout" playsinline controls hidden></video>
     </div>
   </section>
 </main>
@@ -349,8 +349,8 @@ h1{font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
   }));
 
   // ---------- video ----------
-  const V = { ratio: 0.8, color: '#ffffff', audio: true, file: null, blob: null, ext: 'mp4', busy: false };
-  const vsrc = $('#vsrc'), vout = $('#vout'), vcanvas = $('#vcanvas'), vprev = $('#vprev'), vbar = $('#vbar'), vstatus = $('#vstatus');
+  const V = { ratio: 0.8, color: '#ffffff', audio: true, queue: [], busy: false };
+  const vsrc = $('#vsrc'), vcanvas = $('#vcanvas'), vprev = $('#vprev'), vbar = $('#vbar'), vstatus = $('#vstatus'), vgrid = $('#vgrid');
   const vset = t => vstatus.textContent = t || '';
 
   function pickMime(){
@@ -359,18 +359,32 @@ h1{font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
     for (const c of cands) if (MediaRecorder.isTypeSupported(c)) return c;
     return null;
   }
+  const doneItems = () => V.queue.filter(q => q.blob);
+  function vButtons(){
+    $('#vstart').disabled = V.busy || !V.queue.some(q => !q.blob && !q.failed);
+    $('#vsave').disabled = V.busy || !doneItems().length;
+  }
 
   $('#vfile').addEventListener('change', e => {
-    const f = e.target.files[0]; e.target.value = '';
-    if (!f) return;
-    V.file = f; V.blob = null; $('#vsave').disabled = true; vout.hidden = true; vbar.style.width = '0';
-    vsrc.src = URL.createObjectURL(f); vsrc.muted = true; vsrc.load();
-    vsrc.onloadedmetadata = () => {
-      $('#vstart').disabled = false;
-      vset(`${f.name} · ${vsrc.videoWidth}×${vsrc.videoHeight} · ${Math.round(vsrc.duration)}초`);
-      if (!pickMime()) vset('이 브라우저는 영상 녹화를 지원하지 않아요. iPhone Safari에서 열어 주세요.');
-    };
-    vsrc.onerror = () => vset('이 동영상은 브라우저에서 열 수 없어요.');
+    const files = [...e.target.files]; e.target.value = '';
+    if (!files.length) return;
+    if (!pickMime()) { vset('이 브라우저는 영상 녹화를 지원하지 않아요. iPhone Safari에서 열어 주세요.'); return; }
+    for (const f of files) {
+      const card = document.createElement('div'); card.className = 'card';
+      const meta = document.createElement('div'); meta.className = 'meta';
+      const left = document.createElement('div');
+      const name = document.createElement('div'); name.className = 'name'; name.textContent = f.name;
+      const size = document.createElement('div'); size.className = 'size'; size.textContent = '대기 중';
+      left.append(name, size);
+      const dl = document.createElement('button'); dl.className = 'dl'; dl.type = 'button'; dl.textContent = '저장'; dl.disabled = true;
+      meta.append(left, dl);
+      const out = document.createElement('video'); out.playsInline = true; out.controls = true; out.hidden = true; out.style.maxWidth = '100%';
+      card.append(out, meta); vgrid.appendChild(card);
+      const q = { file: f, blob: null, ext: 'mp4', failed: false, sizeEl: size, dl, out };
+      dl.addEventListener('click', () => shareVideos([q]));
+      V.queue.push(q);
+    }
+    vset(`${V.queue.length}개 준비됨`); vButtons();
   });
 
   function vseg(id, attr, cb){ const s = $(id); s.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { s.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); cb(b.dataset[attr]); })); }
@@ -381,25 +395,29 @@ h1{font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
   document.querySelectorAll('.vchip').forEach(ch => ch.addEventListener('click', () => vsetColor(ch.dataset.c)));
   $('#vaudio').addEventListener('change', e => V.audio = e.target.checked);
 
-  $('#vstart').addEventListener('click', async () => {
-    if (V.busy || !V.file) return;
-    const mime = pickMime();
-    if (!mime) { vset('이 브라우저는 영상 녹화를 지원하지 않아요.'); return; }
-    V.busy = true; $('#vstart').disabled = true; $('#vsave').disabled = true; vout.hidden = true;
-    V.ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
+  function loadVideo(file){
+    return new Promise((res, rej) => {
+      vsrc.src = URL.createObjectURL(file); vsrc.muted = true; vsrc.load();
+      vsrc.onloadedmetadata = () => res(); vsrc.onerror = () => rej(new Error('open'));
+    });
+  }
 
-    // size
+  async function convertOne(q, idx, total){
+    const mime = pickMime();
+    q.ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
+    q.sizeEl.textContent = '변환 중…';
+    await loadVideo(q.file);
+
     let w = vsrc.videoWidth, h = vsrc.videoHeight;
     if (w > 1080) { h = Math.round(h * 1080 / w); w = 1080; }
     let cw, ch; if (w / h > V.ratio) { cw = w; ch = Math.round(w / V.ratio); } else { ch = h; cw = Math.round(h * V.ratio); }
-    cw -= cw % 2; ch -= ch % 2; // even dims for h264
+    cw -= cw % 2; ch -= ch % 2;
     vcanvas.width = cw; vcanvas.height = ch; vprev.hidden = false;
     const ctx = vcanvas.getContext('2d');
     const dx = Math.round((cw - w) / 2), dy = Math.round((ch - h) / 2);
     const paint = () => { ctx.fillStyle = V.color; ctx.fillRect(0, 0, cw, ch); ctx.drawImage(vsrc, dx, dy, w, h); };
     paint();
 
-    // streams
     const stream = vcanvas.captureStream(30);
     let actx = null;
     if (V.audio) {
@@ -411,44 +429,57 @@ h1{font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
         srcNode.connect(dest);
         dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
         vsrc.muted = false; vsrc.volume = 1;
-      } catch (e) { vset('소리를 가져오지 못해 무음으로 진행해요.'); }
+      } catch (e) { actx = null; }
     } else { vsrc.muted = true; }
 
     const chunks = [];
     const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
     rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
     const done = new Promise(res => rec.onstop = res);
-
     let raf = 0;
-    const tick = () => { paint(); vbar.style.width = (vsrc.duration ? vsrc.currentTime / vsrc.duration * 100 : 0) + '%'; vset(`변환 중… ${Math.round(vsrc.currentTime)} / ${Math.round(vsrc.duration)}초`); raf = requestAnimationFrame(tick); };
+    const tick = () => { paint(); const p = vsrc.duration ? vsrc.currentTime / vsrc.duration : 0; vbar.style.width = ((idx + p) / total * 100) + '%'; vset(`${idx + 1} / ${total}번째 변환 중… ${Math.round(vsrc.currentTime)} / ${Math.round(vsrc.duration)}초`); raf = requestAnimationFrame(tick); };
 
     vsrc.currentTime = 0;
     await new Promise(r => { if (vsrc.readyState >= 2) r(); else vsrc.oncanplay = r; });
-    rec.start(1000);
-    tick();
-    try { await vsrc.play(); } catch (e) { vset('재생을 시작하지 못했어요. 다시 눌러 주세요.'); cancelAnimationFrame(raf); rec.stop(); V.busy = false; $('#vstart').disabled = false; return; }
+    rec.start(1000); tick();
+    await vsrc.play();
     await new Promise(r => vsrc.onended = r);
     cancelAnimationFrame(raf); paint();
     rec.stop(); await done;
     if (actx) { try { await actx.close(); } catch (e) {} }
+    // release the element from the audio graph for the next file
+    vsrc.removeAttribute('src'); vsrc.load();
 
-    V.blob = new Blob(chunks, { type: mime.split(';')[0] });
-    vbar.style.width = '100%';
-    vout.src = URL.createObjectURL(V.blob); vout.hidden = false; vprev.hidden = true;
-    vset(`완료 · ${(V.blob.size / 1048576).toFixed(1)} MB · ${V.ext.toUpperCase()}`);
-    V.busy = false; $('#vstart').disabled = false; $('#vsave').disabled = false;
+    q.blob = new Blob(chunks, { type: mime.split(';')[0] });
+    q.out.src = URL.createObjectURL(q.blob); q.out.hidden = false;
+    q.sizeEl.textContent = `${(q.blob.size / 1048576).toFixed(1)} MB · ${q.ext.toUpperCase()}`;
+    q.dl.disabled = false;
+  }
+
+  $('#vstart').addEventListener('click', async () => {
+    if (V.busy) return;
+    const todo = V.queue.filter(q => !q.blob && !q.failed);
+    if (!todo.length) return;
+    V.busy = true; vButtons();
+    for (let i = 0; i < todo.length; i++) {
+      try { await convertOne(todo[i], i, todo.length); }
+      catch (e) { todo[i].failed = true; todo[i].sizeEl.textContent = '변환 실패'; }
+    }
+    vprev.hidden = true; vbar.style.width = '100%';
+    V.busy = false; vButtons();
+    const ok = doneItems().length;
+    vset(`${ok}개 완료. "모두 저장"을 누르면 사진 앱으로 보낼 수 있어요.`);
   });
 
-  $('#vsave').addEventListener('click', async () => {
-    if (!V.blob) return;
-    const name = V.file.name.replace(/\.[^.]+$/, '') + '_insta.' + V.ext;
-    const file = new File([V.blob], name, { type: V.blob.type });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file] }); vset('공유 시트에서 "비디오 저장"을 누르면 사진 앱에 들어가요.'); return; }
+  async function shareVideos(items){
+    const files = items.map(q => new File([q.blob], q.file.name.replace(/\.[^.]+$/, '') + '_insta.' + q.ext, { type: q.blob.type }));
+    if (navigator.canShare && navigator.canShare({ files })) {
+      try { await navigator.share({ files }); vset('공유 시트에서 "비디오 저장"을 누르면 사진 앱에 들어가요.'); return; }
       catch (e) { if (e && e.name === 'AbortError') { vset('저장을 취소했어요.'); return; } }
     }
-    const a = document.createElement('a'); a.href = vout.src; a.download = name; document.body.appendChild(a); a.click(); a.remove();
-  });
+    for (const q of items) { const a = document.createElement('a'); a.href = q.out.src; a.download = q.file.name.replace(/\.[^.]+$/, '') + '_insta.' + q.ext; document.body.appendChild(a); a.click(); a.remove(); await new Promise(r => setTimeout(r, 300)); }
+  }
+  $('#vsave').addEventListener('click', () => shareVideos(doneItems()));
 })();
 </script>
 </body>
